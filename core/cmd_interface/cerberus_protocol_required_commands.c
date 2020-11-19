@@ -53,9 +53,9 @@ int cerberus_protocol_get_fw_version (struct cmd_interface_fw_version *fw_versio
 
 	am_util_debug_printf("strncpy: %d\n", area);
 
-	if (fw_version->id[area] != NULL) {
-		strncpy (rsp->version, fw_version->id[area], sizeof (rsp->version));
-	}
+	// if (fw_version->id[area] != NULL) {
+	// 	strncpy (rsp->version, fw_version->id[area], sizeof (rsp->version));
+	// }
 
 	am_util_debug_printf("length\n");
 
