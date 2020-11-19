@@ -146,6 +146,8 @@ static int mctp_interface_generate_error_packet (struct mctp_interface *interfac
 	return 0;
 }
 
+struct cmd_packet global_tx;
+
 /**
  * MCTP interface message processing function
  *
@@ -417,7 +419,12 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 			am_util_debug_printf("max_packet: %d\n", max_packet);
 			n_packets = ceil (interface->msg_buffer.length / (1.0 * max_packet));
 			am_util_debug_printf("n_packets: %d\n", n_packets);
-			*tx_packets = platform_calloc (n_packets, sizeof (struct cmd_packet));
+			if (n_packets == 1) {
+				*tx_packets = &global_tx;
+			} else {
+				*tx_packets = platform_calloc (n_packets, sizeof (struct cmd_packet));
+			}
+			am_util_debug_printf("Pointers: 0x%x; 0x%x\n", *tx_packets, &global_tx);
 
 			am_util_debug_printf("Allocated\n");
 
@@ -443,7 +450,9 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 
 				if ((ROT_IS_ERROR (status)) &&
 					(MCTP_PROTOCOL_IS_VENDOR_MSG (interface->msg_type))) {
-					platform_free (*tx_packets);
+					if (n_packets != 1) {
+						platform_free (*tx_packets);
+					}
 					am_util_debug_printf("Rot Error?\n");
 					return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 						CERBERUS_PROTOCOL_ERROR_UNSPECIFIED, status, src_eid, dest_eid, msg_tag,

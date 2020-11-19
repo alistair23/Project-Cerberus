@@ -132,7 +132,8 @@ int cmd_channel_receive_and_process (struct cmd_channel *channel, struct mctp_in
 			am_util_debug_printf("Expired: %d\n");
 			i = 0;
 			while ((i < (int) num_packets) && (status == 0)) {
-				status = channel->send_packet (channel, &tx_packets[i]);
+				// status = channel->send_packet (channel, &tx_packets[i]);
+				status = channel->send_packet (channel, tx_packets);
 				if (status != 0) {
 					debug_log_create_entry (DEBUG_LOG_SEVERITY_ERROR,
 						DEBUG_LOG_COMPONENT_CMD_INTERFACE, CMD_LOGGING_SEND_PACKET_FAIL,
