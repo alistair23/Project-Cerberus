@@ -5,7 +5,6 @@
 #include "cmd_channel_freertos.h"
 #include "task.h"
 
-
 /**
  * Receive a packet from a command channel.
  *
@@ -16,7 +15,7 @@
  *
  * @return 0 if a packet was successfully received or an error code.
  */
-int cmd_channel_freertos_receive_packet (QueueHandle_t rx_queue, struct cmd_packet *packet,
+int cmd_channel_freertos_receive_packet (struct cmd_channel *channel, struct cmd_packet *packet,
 	int ms_timeout)
 {
 	TickType_t timeout = (ms_timeout < 0) ? portMAX_DELAY : pdMS_TO_TICKS (ms_timeout);
@@ -26,7 +25,7 @@ int cmd_channel_freertos_receive_packet (QueueHandle_t rx_queue, struct cmd_pack
 		return CMD_CHANNEL_INVALID_ARGUMENT;
 	}
 
-	status = xQueueReceive (rx_queue, packet, timeout);
+	status = xQueueReceive (I2CRequestQueue, packet, timeout);
 	if (status == pdFALSE) {
 		return CMD_CHANNEL_RX_TIMEOUT;
 	}
@@ -44,7 +43,7 @@ int cmd_channel_freertos_receive_packet (QueueHandle_t rx_queue, struct cmd_pack
  *
  * @return 0 if the packet was successfully queued or an error code.
  */
-int cmd_channel_freertos_send_packet (QueueHandle_t tx_queue, struct cmd_packet *packet,
+int cmd_channel_freertos_send_packet (struct cmd_channel *channel, struct cmd_packet *packet,
 	int ms_timeout)
 {
 	TickType_t timeout = (ms_timeout < 0) ? portMAX_DELAY : pdMS_TO_TICKS (ms_timeout);
@@ -54,7 +53,7 @@ int cmd_channel_freertos_send_packet (QueueHandle_t tx_queue, struct cmd_packet 
 		return CMD_CHANNEL_INVALID_ARGUMENT;
 	}
 
-	status = xQueueSendToBack (tx_queue, packet, timeout);
+	status = xQueueSendToBack (I2CResponseQueue, packet, timeout);
 	if (status == pdFALSE) {
 		return CMD_CHANNEL_TX_TIMEOUT;
 	}

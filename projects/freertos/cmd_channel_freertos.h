@@ -8,6 +8,8 @@
 #include "queue.h"
 #include "cmd_interface/cmd_channel.h"
 
+extern QueueHandle_t I2CRequestQueue;
+extern QueueHandle_t I2CResponseQueue;
 
 int cmd_channel_freertos_receive_packet (QueueHandle_t rx_queue, struct cmd_packet *packet,
 	int ms_timeout);
