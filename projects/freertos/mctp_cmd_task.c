@@ -51,7 +51,7 @@ int mctp_cmd_task_init (struct mctp_cmd_task *task, struct cmd_channel *channel,
 	task->channel = channel;
 	task->mctp = mctp;
 
-	status = xTaskCreate (mctp_cmd_task_loop, "MCTP_LOOP", 6 * 256, task, CERBERUS_PRIORITY_HIGH,
+	status = xTaskCreate (mctp_cmd_task_loop, "MCTP_LOOP", 8 * 256, task, CERBERUS_PRIORITY_HIGH,
 		&task->cmd_loop_task);
 	if (status != pdPASS) {
 		am_util_debug_printf("Fail\n");
