@@ -19,6 +19,7 @@ static void mctp_cmd_task_loop (void *data)
 
 	while (1) {
 		cmd_channel_receive_and_process (task->channel, task->mctp, -1);
+		vTaskDelay(1000);
 	}
 }
 
