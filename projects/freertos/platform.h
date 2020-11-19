@@ -5,7 +5,6 @@
 #define FREERTOS_PLATFORM_H_
 
 #include <stdint.h>
-#include "platform_compiler.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"

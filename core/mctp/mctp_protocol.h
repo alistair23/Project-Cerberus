@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "status/rot_status.h"
-#include "platform_config.h"
 
 
 /* Configurable MCTP protocol parameters.  Defaults can be overridden in platform_config.h. */
