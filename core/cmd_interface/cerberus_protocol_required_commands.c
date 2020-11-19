@@ -14,7 +14,9 @@
 #include "device_manager.h"
 #include "session_manager.h"
 #include "cerberus_protocol_required_commands.h"
-
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 /**
  * Process FW version packet
@@ -27,6 +29,7 @@
 int cerberus_protocol_get_fw_version (struct cmd_interface_fw_version *fw_version,
 	struct cmd_interface_request *request)
 {
+	am_util_debug_printf("cerberus_protocol_get_fw_version\n");
 	struct cerberus_protocol_get_fw_version *rq =
 		(struct cerberus_protocol_get_fw_version*) request->data;
 	struct cerberus_protocol_get_fw_version_response *rsp =
@@ -34,21 +37,32 @@ int cerberus_protocol_get_fw_version (struct cmd_interface_fw_version *fw_versio
 	uint8_t area;
 
 	if (request->length != sizeof (struct cerberus_protocol_get_fw_version)) {
+		am_util_debug_printf("CMD_HANDLER_BAD_LENGTH\n");
 		return CMD_HANDLER_BAD_LENGTH;
 	}
 
 	if (rq->area >= fw_version->count) {
+		am_util_debug_printf("CMD_HANDLER_UNSUPPORTED_INDEX\n");
 		return CMD_HANDLER_UNSUPPORTED_INDEX;
 	}
 
+	am_util_debug_printf("memset\n");
+
 	area = rq->area;
 	memset (&rsp->version, 0, sizeof (rsp->version));
+
+	am_util_debug_printf("strncpy: %d\n", area);
 
 	if (fw_version->id[area] != NULL) {
 		strncpy (rsp->version, fw_version->id[area], sizeof (rsp->version));
 	}
 
+	am_util_debug_printf("length\n");
+
 	request->length = sizeof (struct cerberus_protocol_get_fw_version_response);
+
+	am_util_debug_printf("request->length: %d\n", request->length);
+
 	return 0;
 }
 

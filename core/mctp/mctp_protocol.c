@@ -7,7 +7,9 @@
 #include <string.h>
 #include "crypto/checksum.h"
 #include "mctp_protocol.h"
-
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 /**
  * Parse an MCTP packet header and determine if the packet is valid.
@@ -41,10 +43,12 @@ int mctp_protocol_interpret (uint8_t *buf, size_t buf_len, uint8_t dest_addr, ui
 	if ((buf == NULL) || (source_addr == NULL) || (som == NULL) || (eom == NULL) ||
 		(src_eid == NULL) || (dest_eid == NULL) || (payload == NULL) || (payload_len == NULL) ||
 		(msg_tag == NULL) || (packet_seq == NULL) || (crc == NULL) || (msg_type == NULL)) {
+		am_util_debug_printf("Invalid args\n");
 		return MCTP_PROTOCOL_INVALID_ARGUMENT;
 	}
 
 	if (buf_len < sizeof (struct mctp_protocol_transport_header)) {
+		am_util_debug_printf("Too short\n");
 		return MCTP_PROTOCOL_MSG_TOO_SHORT;
 	}
 
@@ -63,30 +67,44 @@ int mctp_protocol_interpret (uint8_t *buf, size_t buf_len, uint8_t dest_addr, ui
 
 	if (MCTP_PROTOCOL_IS_CONTROL_MSG (*msg_type)) {
 		/* Control messages do not contain a CRC on the packet. */
+		am_util_debug_printf("Control\n");
 		packet_len = header->byte_count + 2;
 		*payload_len = packet_len - sizeof (struct mctp_protocol_transport_header);
 		add_crc = false;
 	}
 	else if (MCTP_PROTOCOL_IS_VENDOR_MSG (*msg_type)) {
+		am_util_debug_printf("Vendor\n");
 		packet_len = header->byte_count + 3;
 		*payload_len = packet_len - sizeof (struct mctp_protocol_transport_header) - 1;
 	}
 	else {
+		am_util_debug_printf("Unsupported\n");
 		return MCTP_PROTOCOL_UNSUPPORTED_MSG;
 	}
 
 	if ((header->cmd_code != SMBUS_CMD_CODE_MCTP) || (buf_len < packet_len) ||
 		(header->rsvd != 0)) {
+		am_util_debug_printf("invalid msg\n");
+		am_util_debug_printf("header->cmd_code: 0x%x, 0x%x\n", header->cmd_code, SMBUS_CMD_CODE_MCTP);
+		am_util_debug_printf("buf_len: %d, %d\n", buf_len, packet_len);
+		am_util_debug_printf("header->rsvd: %d\n", header->rsvd);
 		return MCTP_PROTOCOL_INVALID_MSG;
 	}
 
 	if (header->header_version != MCTP_PROTOCOL_SUPPORTED_HDR_VERSION) {
+		am_util_debug_printf("Unsupported args\n");
 		return MCTP_PROTOCOL_UNSUPPORTED_MSG;
 	}
 
 	if (add_crc) {
+		int i;
+		for (i = 0; i < packet_len; i++) {
+			am_util_debug_printf("buf[%d] 0x%x\n", i, buf[i]);
+		}
+		am_util_debug_printf("(dest_addr << 1): 0x%x; %d\n", (dest_addr << 1), packet_len);
 		*crc = checksum_crc8 ((dest_addr << 1), buf, packet_len - 1);
 		if (*crc != buf[packet_len - 1]) {
+			am_util_debug_printf("Bad checksum: buf[%d] 0x%x != 0x%x\n", packet_len - 1, buf[packet_len - 1], *crc);
 			return MCTP_PROTOCOL_BAD_CHECKSUM;
 		}
 	}
@@ -168,9 +186,14 @@ int mctp_protocol_construct (uint8_t *buf, size_t buf_len, uint8_t *out_buf, siz
 	header->msg_tag = msg_tag;
 	header->tag_owner = tag_owner;
 
+	am_util_debug_printf("msg_offset: %d\n", msg_offset);
+
 	memcpy (&out_buf[msg_offset], buf, buf_len);
+	am_util_debug_printf("out_buf[%d]: 0x%x\n", msg_offset, out_buf[msg_offset]);
+	am_util_debug_printf("out_buf[%d]: 0x%x\n", msg_offset + 1, out_buf[msg_offset + 1]);
 	if (crc) {
 		out_buf[msg_offset + buf_len] = checksum_crc8 ((dest_addr << 1), out_buf, out_len - 1);
+		am_util_debug_printf("dest_addr: 0x%x; out_buf[%d]: 0x%x; out_len: %d\n", dest_addr << 1, msg_offset + buf_len, out_buf[msg_offset + buf_len], out_len);
 	}
 
 	return out_len;

@@ -5,7 +5,11 @@
 #include <stddef.h>
 #include <string.h>
 #include "mctp_cmd_task.h"
+#include "task_priority.h"
 
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 /**
  * MCTP command loop
@@ -38,6 +42,7 @@ int mctp_cmd_task_init (struct mctp_cmd_task *task, struct cmd_channel *channel,
 	int status;
 
 	if ((task == NULL) || (channel == NULL) || (mctp == NULL)) {
+		am_util_debug_printf("Error\n");
 		return CMD_HANDLER_INVALID_ARGUMENT;
 	}
 
@@ -49,6 +54,7 @@ int mctp_cmd_task_init (struct mctp_cmd_task *task, struct cmd_channel *channel,
 	status = xTaskCreate (mctp_cmd_task_loop, "MCTP_LOOP", 6 * 256, task, CERBERUS_PRIORITY_HIGH,
 		&task->cmd_loop_task);
 	if (status != pdPASS) {
+		am_util_debug_printf("Fail\n");
 		return status;
 	}
 

@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include "cmd_channel_freertos.h"
 #include "task.h"
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 /**
  * Receive a packet from a command channel.
@@ -18,15 +21,19 @@
 int cmd_channel_freertos_receive_packet (struct cmd_channel *channel, struct cmd_packet *packet,
 	int ms_timeout)
 {
+	am_util_debug_printf("cmd_channel_freertos_receive_packet\n");
+
 	TickType_t timeout = (ms_timeout < 0) ? portMAX_DELAY : pdMS_TO_TICKS (ms_timeout);
 	BaseType_t status;
 
 	if (packet == NULL) {
+		am_util_debug_printf("No packet\n");
 		return CMD_CHANNEL_INVALID_ARGUMENT;
 	}
 
 	status = xQueueReceive (I2CRequestQueue, packet, timeout);
 	if (status == pdFALSE) {
+		am_util_debug_printf("Timeout\n");
 		return CMD_CHANNEL_RX_TIMEOUT;
 	}
 

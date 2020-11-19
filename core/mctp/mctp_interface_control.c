@@ -10,6 +10,9 @@
 #include "mctp_protocol.h"
 #include "mctp_interface.h"
 #include "mctp_interface_control.h"
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 
 /**
@@ -214,17 +217,25 @@ static int mctp_interface_control_get_vendor_def_msg_support (struct mctp_interf
 
 	if (request->length != (MCTP_PROTOCOL_MIN_CONTROL_MSG_LEN +
 		sizeof (struct mctp_control_get_vendor_def_msg_support_request_packet))) {
+		am_util_debug_printf("MCTP_PROTOCOL_ERROR_INVALID_LEN\n");
 		response->completion_code = MCTP_PROTOCOL_ERROR_INVALID_LEN;
 	}
 	else if (rq->vid_set_selector != CERBERUS_VID_SET) {
+		am_util_debug_printf("MCTP_PROTOCOL_ERROR_INVALID_DATA: %d != %d\n", rq->vid_set_selector, CERBERUS_VID_SET);
 		response->completion_code = MCTP_PROTOCOL_ERROR_INVALID_DATA;
 	}
 	else {
+		am_util_debug_printf("Generating response 0x%x\n", MCTP_PROTOCOL_MIN_CONTROL_MSG_LEN);
+		am_util_debug_printf("MCTP_PROTOCOL_SUCCESS: 0x%x\n", MCTP_PROTOCOL_SUCCESS);
 		response->completion_code = MCTP_PROTOCOL_SUCCESS;
+		am_util_debug_printf("CERBERUS_VID_SET_RESPONSE: 0x%x\n", CERBERUS_VID_SET_RESPONSE);
 		response->vid_set_selector = CERBERUS_VID_SET_RESPONSE;
+		am_util_debug_printf("MCTP_PROTOCOL_VID_FORMAT_PCI: 0x%x\n", MCTP_PROTOCOL_VID_FORMAT_PCI);
 		response->vid_format = MCTP_PROTOCOL_VID_FORMAT_PCI;
 		response->vid = platform_htons (intf->pci_vendor_id);
+		am_util_debug_printf("response->vid: 0x%x\n", response->vid);
 		response->protocol_version = platform_htons (intf->protocol_version);
+		am_util_debug_printf("response->protocol_version: 0x%x\n", response->protocol_version);
 	}
 
 	request->length = MCTP_PROTOCOL_MIN_CONTROL_MSG_LEN +
@@ -249,6 +260,7 @@ int mctp_interface_control_process_request (struct mctp_interface *intf,
 	struct mctp_protocol_control_header *header;
 
 	if ((intf == NULL ) || (request == NULL)) {
+		am_util_debug_printf("CMD_HANDLER_INVALID_ARGUMENT\n");
 		return CMD_HANDLER_INVALID_ARGUMENT;
 	}
 
@@ -258,11 +270,13 @@ int mctp_interface_control_process_request (struct mctp_interface *intf,
 	header = (struct mctp_protocol_control_header*) &request->data[0];
 
 	if (request->length < MCTP_PROTOCOL_MIN_CONTROL_MSG_LEN) {
+		am_util_debug_printf("CMD_HANDLER_PAYLOAD_TOO_SHORT\n");
 		return CMD_HANDLER_PAYLOAD_TOO_SHORT;
 	}
 
 	if ((header->msg_type != (MCTP_PROTOCOL_MSG_TYPE_CONTROL_MSG)) ||
 		(header->integrity_check != 0) || (header->d_bit != 0) || (header->rsvd != 0)) {
+		am_util_debug_printf("CMD_HANDLER_UNSUPPORTED_MSG\n");
 		return CMD_HANDLER_UNSUPPORTED_MSG;
 	}
 
@@ -271,12 +285,15 @@ int mctp_interface_control_process_request (struct mctp_interface *intf,
 
 		switch (header->command_code) {
 			case MCTP_PROTOCOL_GET_VEN_DEF_MSG_SUPPORT:
+				am_util_debug_printf("MCTP_PROTOCOL_GET_VEN_DEF_MSG_SUPPORT\n");
 				return mctp_interface_control_get_vendor_def_msg_support (intf, request);
 
 			case MCTP_PROTOCOL_SET_EID:
+				am_util_debug_printf("MCTP_PROTOCOL_SET_EID\n");
 				return mctp_interface_control_set_eid (intf, request);
 
 			default:
+				am_util_debug_printf("Unknown\n");
 				return CMD_HANDLER_UNKNOWN_COMMAND;
 		}
 	}

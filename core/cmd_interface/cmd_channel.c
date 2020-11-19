@@ -9,6 +9,9 @@
 #include "cmd_channel.h"
 #include "cmd_logging.h"
 
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 /**
  * Initialize the base channel components.
@@ -77,16 +80,29 @@ int cmd_channel_receive_and_process (struct cmd_channel *channel, struct mctp_in
 	int i;
 	int status;
 
-	if ((channel == NULL) || (mctp == NULL)) {
+	am_util_debug_printf("cmd_channel_receive_and_process\n");
+
+	if (channel == NULL) {
+		am_util_debug_printf("Invalid channel\n");
 		return CMD_CHANNEL_INVALID_ARGUMENT;
 	}
 
+	if (mctp == NULL) {
+		am_util_debug_printf("Invalid mctp\n");
+		return CMD_CHANNEL_INVALID_ARGUMENT;
+	}
+
+	// am_util_debug_printf("   receive_packet\n");
 	status = channel->receive_packet (channel, &rx_packet, ms_timeout);
+	// am_util_debug_printf("   done?\n");
 	if (status != 0) {
+		am_util_debug_printf("   status != 0\n");
 		debug_log_create_entry (DEBUG_LOG_SEVERITY_ERROR, DEBUG_LOG_COMPONENT_CMD_INTERFACE,
 			CMD_LOGGING_RECEIVE_PACKET_FAIL, channel->id, status);
 		return status;
 	}
+
+	am_util_debug_printf("Got a packet\n");
 
 	/* We don't support packets larger than the maximum defined size, so there is no need to
 	 * attempt to aggregate transactions that send too much data.  Just throw the data away. */
@@ -96,6 +112,7 @@ int cmd_channel_receive_and_process (struct cmd_channel *channel, struct mctp_in
 
 		channel->overflow = true;
 		mctp_interface_reset_message_processing (mctp);
+		am_util_debug_printf("Overflow error\n");
 		return CMD_CHANNEL_PKT_OVERFLOW;
 	}
 	else if (channel->overflow) {
@@ -103,12 +120,16 @@ int cmd_channel_receive_and_process (struct cmd_channel *channel, struct mctp_in
 		 * remaining bytes from the transaction that triggered the overflow condition, so it doesn't
 		 * actually represent valid data. */
 		channel->overflow = false;
+		am_util_debug_printf("Setting overflow\n");
 		return 0;
 	}
 
 	status = mctp_interface_process_packet (mctp, &rx_packet, &tx_packets, &num_packets);
+	am_util_debug_printf("tx_packets: 0x%x\n", tx_packets);
+	am_util_debug_printf("Processed: %d\n", status);
 	if (status == 0) {
 		if (!rx_packet.timeout_valid || !platform_has_timeout_expired (&rx_packet.pkt_timeout)) {
+			am_util_debug_printf("Expired: %d\n");
 			i = 0;
 			while ((i < (int) num_packets) && (status == 0)) {
 				status = channel->send_packet (channel, &tx_packets[i]);
@@ -122,6 +143,7 @@ int cmd_channel_receive_and_process (struct cmd_channel *channel, struct mctp_in
 			}
 		}
 		else {
+			am_util_debug_printf("CMD warning\n");
 			debug_log_create_entry (DEBUG_LOG_SEVERITY_WARNING, DEBUG_LOG_COMPONENT_CMD_INTERFACE,
 				CMD_LOGGING_COMMAND_TIMEOUT, channel->id, 0);
 		}

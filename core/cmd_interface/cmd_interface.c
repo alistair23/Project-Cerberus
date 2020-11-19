@@ -9,6 +9,10 @@
 #include "cerberus_protocol.h"
 #include "session_manager.h"
 #include "cmd_interface.h"
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
+
 
 
 /**
@@ -59,6 +63,7 @@ int cmd_interface_process_request (struct cmd_interface *intf,
 	int status;
 	
 	if (request == NULL) {
+		am_util_debug_printf("CMD_HANDLER_INVALID_ARGUMENT\n");
 		return CMD_HANDLER_INVALID_ARGUMENT;
 	}
 		
@@ -66,6 +71,7 @@ int cmd_interface_process_request (struct cmd_interface *intf,
 	request->crypto_timeout = false;
 
 	if (intf == NULL) {
+		am_util_debug_printf("CMD_HANDLER_INVALID_ARGUMENT\n");
 		return CMD_HANDLER_INVALID_ARGUMENT;
 	}
 
@@ -73,25 +79,35 @@ int cmd_interface_process_request (struct cmd_interface *intf,
 
 	header = (struct cerberus_protocol_header*) request->data;
 
+	am_util_debug_printf("Got the header\n");
+
 	if (request->length < CERBERUS_PROTOCOL_MIN_MSG_LEN) {
+		am_util_debug_printf("CMD_HANDLER_PAYLOAD_TOO_SHORT\n");
 		return CMD_HANDLER_PAYLOAD_TOO_SHORT;
 	}
 
 	if ((header->msg_type != (MCTP_PROTOCOL_MSG_TYPE_VENDOR_DEF)) || 
 		(header->pci_vendor_id != CERBERUS_PROTOCOL_MSFT_PCI_VID)) {
+		am_util_debug_printf("CMD_HANDLER_UNSUPPORTED_MSG\n");
 		return CMD_HANDLER_UNSUPPORTED_MSG;
 	}
 
 	if (rsvd_zero) {
 		if ((header->reserved1 != 0) || (header->reserved2 != 0)) {
+			am_util_debug_printf("CMD_HANDLER_RSVD_NOT_ZERO\n");
 			return CMD_HANDLER_RSVD_NOT_ZERO;
 		}
 	}
 
+	am_util_debug_printf("Setting commands\n");
+
 	*command_id = header->command;
 	*command_set = header->rq;
 
+	am_util_debug_printf("Set commands\n");
+
 	if (header->crypt && decrypt) {
+		am_util_debug_printf("Trying to decrypt\n");
 		if (intf->session) {
 			status = intf->session->decrypt_message (intf->session, request);
 			if (status != 0) {
@@ -107,6 +123,7 @@ int cmd_interface_process_request (struct cmd_interface *intf,
 	}
 
 	if (header->command == CERBERUS_PROTOCOL_ERROR) {
+		am_util_debug_printf("CMD_ERROR_MESSAGE_ESCAPE_SEQ\n");
 		return CMD_ERROR_MESSAGE_ESCAPE_SEQ;
 	}
 

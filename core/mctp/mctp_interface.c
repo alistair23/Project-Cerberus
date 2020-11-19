@@ -15,6 +15,9 @@
 #include "mctp_protocol.h"
 #include "mctp_interface_control.h"
 #include "mctp_interface.h"
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 
 /**
@@ -196,6 +199,7 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 	response_addr = source_addr;
 
 	if (status != 0) {
+		am_util_debug_printf("status != 0: 0x%x, 0x%x\n", status, MCTP_PROTOCOL_INVALID_MSG);
 		if ((status == MCTP_PROTOCOL_INVALID_MSG) || (status == MCTP_PROTOCOL_UNSUPPORTED_MSG)) {
 			return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 				CERBERUS_PROTOCOL_ERROR_INVALID_REQ, status, src_eid, dest_eid, msg_tag,
@@ -228,6 +232,7 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 	}
 
 	if (dest_eid != interface->eid) {
+		am_util_debug_printf("EIDs don't match: 0x%x, 0x%x\n", dest_eid, interface->eid);
 		return 0;
 	}
 
@@ -241,23 +246,27 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 		interface->msg_tag = msg_tag;
 	}
 	else if (interface->start_packet_len == 0) {
+		am_util_debug_printf("interface->start_packet_len == 0\n");
 		// If this packet is not a SOM, and we haven't received a SOM packet yet
 		return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 			CERBERUS_PROTOCOL_ERROR_OUT_OF_ORDER_MSG, 0, src_eid, dest_eid, msg_tag, response_addr,
 			rx_packet->dest_addr, cmd_set);
 	}
 	else if (packet_seq != interface->packet_seq) {
+		am_util_debug_printf("packet_seq != interface->packet_seq\n");
 		return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 			CERBERUS_PROTOCOL_ERROR_OUT_OF_SEQ_WINDOW, 0, src_eid, dest_eid, msg_tag, response_addr,
 			rx_packet->dest_addr, cmd_set);
 	}
 	else if (msg_tag != interface->msg_tag) {
+		am_util_debug_printf("msg_tag != interface->msg_tag\n");
 		return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 			CERBERUS_PROTOCOL_ERROR_INVALID_REQ, 0, src_eid, dest_eid, msg_tag, response_addr,
 			rx_packet->dest_addr, cmd_set);
 	}
 	else if ((src_eid != interface->msg_buffer.source_eid) ||
 		(dest_eid != interface->msg_buffer.target_eid)) {
+		am_util_debug_printf("Other badness\n");
 		return 0;
 	}
 	else {
@@ -271,6 +280,7 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 	}
 
 	if ((payload_len + interface->msg_buffer.length) > sizeof (interface->msg_buffer.data)) {
+		am_util_debug_printf("Lengs don't match\n");
 		return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 			CERBERUS_PROTOCOL_ERROR_MSG_OVERFLOW, payload_len + interface->msg_buffer.length,
 			src_eid, dest_eid, msg_tag, response_addr, rx_packet->dest_addr, cmd_set);
@@ -282,6 +292,7 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 	interface->packet_seq = (interface->packet_seq + 1) % 4;
 
 	if (eom) {
+		am_util_debug_printf("Have an EOM\n");
 		if (MCTP_PROTOCOL_IS_CONTROL_MSG (interface->msg_type)) {
 			status = mctp_interface_control_process_request (interface,	&interface->msg_buffer,
 				source_addr);
@@ -289,26 +300,34 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 				debug_log_create_entry (DEBUG_LOG_SEVERITY_ERROR, DEBUG_LOG_COMPONENT_MCTP,
 					MCTP_LOGGING_CONTROL_FAIL, status, 0);
 
+				am_util_debug_printf("Not control?\n");
+
 				return status;
 			}
 		}
 		else if (MCTP_PROTOCOL_IS_VENDOR_MSG (interface->msg_type)) {
+			am_util_debug_printf("Vendor message EOM\n");
 			header = (struct cerberus_protocol_header*) interface->msg_buffer.data;
 			cmd_set = header->rq;
 
 			interface->msg_buffer.max_response = device_manager_get_max_message_len_by_eid (
 				interface->device_manager, src_eid);
+			am_util_debug_printf("Max length\n");
 			status = interface->cmd_interface->process_request (interface->cmd_interface,
 				&interface->msg_buffer);
 
+			am_util_debug_printf("Finished processing\n");
+
 			/* Regardless of the processing status, check to see if the timeout needs adjusting. */
 			if (rx_packet->timeout_valid && interface->msg_buffer.crypto_timeout) {
+				am_util_debug_printf("Increase timeout\n");
 				platform_increase_timeout (
 					MCTP_PROTOCOL_MAX_CRYPTO_TIMEOUT_MS - MCTP_PROTOCOL_MAX_RESPONSE_TIMEOUT_MS,
 					&rx_packet->pkt_timeout);
 			}
 
 			if (status == CMD_ERROR_MESSAGE_ESCAPE_SEQ) {
+				am_util_debug_printf("Escape\n");
 				if (interface->msg_buffer.length == sizeof (struct cerberus_protocol_error)) {
 					struct cerberus_protocol_error *error_msg =
 						(struct cerberus_protocol_error*) interface->msg_buffer.data;
@@ -318,6 +337,8 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 						(error_msg->error_code << 24 | src_eid << 16 | dest_eid << 8 | msg_tag),
 						error_msg->error_data);
 				}
+
+				am_util_debug_printf("Done\n");
 
 				return 0;
 			}
@@ -348,11 +369,13 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 	#endif
 
 			if (status != 0) {
+				am_util_debug_printf("Error still: %d\n", status);
 				return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 					CERBERUS_PROTOCOL_ERROR_UNSPECIFIED, status, src_eid, dest_eid, msg_tag,
 					response_addr, rx_packet->dest_addr, cmd_set);
 			}
 			else if (interface->msg_buffer.length == 0) {
+				am_util_debug_printf("Wrong length\n");
 				return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 					CERBERUS_PROTOCOL_NO_ERROR, status, src_eid, dest_eid, msg_tag, response_addr,
 					rx_packet->dest_addr, cmd_set);
@@ -360,16 +383,20 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 
 			if (interface->msg_buffer.length >
 				device_manager_get_max_message_len_by_eid (interface->device_manager, src_eid)) {
+				am_util_debug_printf("Buffer shit\n");
 				return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 					CERBERUS_PROTOCOL_ERROR_UNSPECIFIED, MCTP_PROTOCOL_MSG_TOO_LARGE, src_eid,
 					dest_eid, msg_tag, response_addr, rx_packet->dest_addr, cmd_set);
 			}
 		}
 		else {
+			am_util_debug_printf("else error\n");
 			return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 				CERBERUS_PROTOCOL_ERROR_INVALID_REQ, MCTP_PROTOCOL_UNSUPPORTED_MSG, src_eid,
 				dest_eid, msg_tag, response_addr, rx_packet->dest_addr, cmd_set);
 		}
+
+		am_util_debug_printf("Made it here\n");
 
 		if (interface->msg_buffer.new_request) {
 			tag_owner = MCTP_PROTOCOL_TO_REQUEST;
@@ -383,12 +410,19 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 			i_buf = 0;
 			som = true;
 
+			am_util_debug_printf("Calculating max packet?\n");
+
 			max_packet = device_manager_get_max_transmission_unit_by_eid (interface->device_manager,
 				src_eid);
+			am_util_debug_printf("max_packet: %d\n", max_packet);
 			n_packets = ceil (interface->msg_buffer.length / (1.0 * max_packet));
+			am_util_debug_printf("n_packets: %d\n", n_packets);
 			*tx_packets = platform_calloc (n_packets, sizeof (struct cmd_packet));
 
+			am_util_debug_printf("Allocated\n");
+
 			if ((*tx_packets == NULL) && (MCTP_PROTOCOL_IS_VENDOR_MSG (interface->msg_type))) {
+				am_util_debug_printf("Vendor message error\n");
 				return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 					CERBERUS_PROTOCOL_ERROR_UNSPECIFIED, MCTP_PROTOCOL_NO_MEMORY, src_eid, dest_eid,
 					msg_tag, response_addr, rx_packet->dest_addr, cmd_set);
@@ -399,20 +433,24 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 				payload_len = (interface->msg_buffer.length > max_packet) ?
 					max_packet : interface->msg_buffer.length;
 
+				am_util_debug_printf("Constructing: 0x%x; 0x%x; 0x%x; %d\n", interface->msg_buffer.data[3], interface->msg_buffer.data[4], interface->msg_buffer.data[5], payload_len);
 				status = mctp_protocol_construct (&interface->msg_buffer.data[i_buf], payload_len,
 					(*tx_packets)[i_packet].data, CMD_MAX_PACKET_SIZE, rx_packet->dest_addr,
 					interface->msg_buffer.source_eid, interface->msg_buffer.target_eid, som, eom,
 					interface->packet_seq, interface->msg_tag, tag_owner, response_addr,
 					&interface->msg_type);
+				am_util_debug_printf("Done\n");
 
 				if ((ROT_IS_ERROR (status)) &&
 					(MCTP_PROTOCOL_IS_VENDOR_MSG (interface->msg_type))) {
 					platform_free (*tx_packets);
+					am_util_debug_printf("Rot Error?\n");
 					return mctp_interface_generate_error_packet (interface, tx_packets, num_packets,
 						CERBERUS_PROTOCOL_ERROR_UNSPECIFIED, status, src_eid, dest_eid, msg_tag,
 						response_addr, rx_packet->dest_addr, cmd_set);
 				}
 				else {
+					am_util_debug_printf("Setting: %d\n", status);
 					som = false;
 					interface->packet_seq = (interface->packet_seq + 1) % 4;
 					interface->msg_buffer.length -= payload_len;
@@ -431,6 +469,8 @@ int mctp_interface_process_packet (struct mctp_interface *interface, struct cmd_
 			*num_packets = 0;
 		}
 	}
+
+	am_util_debug_printf("Retrun 0\n");
 
 	return 0;
 }

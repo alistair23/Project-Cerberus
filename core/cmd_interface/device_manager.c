@@ -8,6 +8,9 @@
 #include "device_manager.h"
 #include "common/common_math.h"
 #include "mctp/mctp_protocol.h"
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
 
 
 /**
@@ -160,12 +163,20 @@ int device_manager_get_device_num (struct device_manager *mgr, uint8_t eid)
 {
 	int i_device;
 
+	am_util_debug_printf("device_manager_get_device_num: 0x%x\n", mgr);
+
 	if (mgr == NULL) {
+		am_util_debug_printf("DEVICE_MGR_INVALID_ARGUMENT\n");
 		return DEVICE_MGR_INVALID_ARGUMENT;
 	}
 
+	am_util_debug_printf("loop from 0 to %d\n", mgr->num_devices);
+
 	for (i_device = 0; i_device < mgr->num_devices; ++i_device) {
+		am_util_debug_printf("mgr->entries[i_device].info.eid: 0x%x\n", mgr->entries[i_device].info.eid);
+		am_util_debug_printf("eid: 0x%x\n", eid);
 		if (mgr->entries[i_device].info.eid == eid) {
+			am_util_debug_printf("Old mate\n");
 			return i_device;
 		}
 	}
